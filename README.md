@@ -6,9 +6,8 @@ Solucion vagrant plugin uninstall vagrant-vbguest
 
 <br>
 
-cd vagrant-ejemplos
+cd vagrant-ejemplos<br>
 vagrant up<br>
-
 vagrant ssh<br>
 
 
