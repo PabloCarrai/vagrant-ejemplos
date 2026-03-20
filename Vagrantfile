@@ -1,5 +1,5 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "debian/testing64"
+  config.vm.box = "alvistack/debian-13"
 
   config.vm.network "forwarded_port", guest: 8080, host: 8080, auto_correct: true
 
