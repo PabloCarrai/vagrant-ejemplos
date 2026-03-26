@@ -1,0 +1,44 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+
+  # Mapeo de puertos: Tu navegador 8081 -> Vagrant 8080
+  config.vm.network "forwarded_port", guest: 8080, host: 8081
+
+  # Configuración de VirtualBox
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "8048"
+    vb.cpus = 4
+    # Esto ayuda a que VirtualBox no se cuelgue con las Guest Additions
+    vb.customize ["modifyvm", :id, "--uartmode1", "disconnected"]
+  end
+
+  # OPCIONAL: Si quieres compartir tu carpeta actual con la VM
+  # config.vm.synced_folder ".", "/home/vagrant/app_local", type: "virtualbox"
+
+  config.vm.provision "shell", inline: <<-SHELL
+    export DEBIAN_FRONTEND=noninteractive
+    
+    echo "--- Actualizando sistema e instalando dependencias ---"
+    apt-get update -y
+    apt-get install -y ca-certificates curl gnupg git build-essential dkms
+
+    # Instalación de Docker (Método oficial)
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+
+    # Permisos para el usuario vagrant
+    usermod -aG docker vagrant
+
+    echo "--- Clonando repositorio ---"
+    # Borramos si ya existe para evitar errores en re-provisioning
+    rm -rf /home/vagrant/app
+    su - vagrant -c "git clone https://github.com/PabloCarrai/php-minimo-Consumido-Docker.git /home/vagrant/app"
+
+    echo "--- Entorno listo! Accede a http://localhost:8081 ---"
+  SHELL
+end
