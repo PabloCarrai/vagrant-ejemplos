@@ -31,7 +31,7 @@ Vagrant.configure("2") do |config|
 
     echo "=== Clonando el repositorio ==="
     REPO_URL="https://github.com/PabloCarrai/php-minimo-Consumido-Docker.git"
-    PROJECT_DIR="/home/vagrant/mi-proyecto"
+    PROJECT_DIR="/home/vagrant/app"
 
     su - vagrant -c "git clone ${REPO_URL} ${PROJECT_DIR} 2>/dev/null || echo 'El repositorio ya existe'"
 
