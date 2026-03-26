@@ -1,44 +1,54 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
 
-  # Mapeo de puertos: Tu navegador 8081 -> Vagrant 8080
   config.vm.network "forwarded_port", guest: 8080, host: 8081
 
-  # Configuración de VirtualBox
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "8048"
-    vb.cpus = 4
-    # Esto ayuda a que VirtualBox no se cuelgue con las Guest Additions
-    vb.customize ["modifyvm", :id, "--uartmode1", "disconnected"]
+    vb.cpus = "4"
   end
 
-  # OPCIONAL: Si quieres compartir tu carpeta actual con la VM
-  # config.vm.synced_folder ".", "/home/vagrant/app_local", type: "virtualbox"
+  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+    echo "=== Actualizando sistema ==="
+    apt-get update -y && apt-get upgrade -y
 
-  config.vm.provision "shell", inline: <<-SHELL
-    export DEBIAN_FRONTEND=noninteractive
-    
-    echo "--- Actualizando sistema e instalando dependencias ---"
-    apt-get update -y
-    apt-get install -y ca-certificates curl gnupg git build-essential dkms
+    echo "=== Instalando git y dependencias ==="
+    apt-get install -y git ca-certificates curl gnupg lsb-release
 
-    # Instalación de Docker (Método oficial)
-    install -m 0755 -d /etc/apt/keyrings
+    echo "=== Instalando Docker ==="
+    mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
     apt-get update -y
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-    # Permisos para el usuario vagrant
+    echo "=== Añadiendo usuario vagrant al grupo docker ==="
     usermod -aG docker vagrant
 
-    echo "--- Clonando repositorio ---"
-    # Borramos si ya existe para evitar errores en re-provisioning
-    rm -rf /home/vagrant/app
-    su - vagrant -c "git clone https://github.com/PabloCarrai/php-minimo-Consumido-Docker.git /home/vagrant/app"
+    echo "=== Clonando el repositorio ==="
+    REPO_URL="https://github.com/PabloCarrai/php-minimo-Consumido-Docker.git"
+    PROJECT_DIR="/home/vagrant/mi-proyecto"
 
-    echo "--- Entorno listo! Accede a http://localhost:8081 ---"
+    su - vagrant -c "git clone ${REPO_URL} ${PROJECT_DIR} 2>/dev/null || echo 'El repositorio ya existe'"
+
+    echo "=== Iniciando docker compose automáticamente ==="
+    # Cambia el nombre del archivo si no es docker-compose.yml (ej: compose.yaml)
+    COMPOSE_FILE="${PROJECT_DIR}/docker-compose.yml"
+
+    if [ -f "${COMPOSE_FILE}" ]; then
+      echo "docker-compose.yml encontrado. Levantando servicios..."
+      su - vagrant -c "cd ${PROJECT_DIR} && docker compose up -d --build"
+      echo "✅ Docker Compose iniciado en segundo plano (-d)"
+    else
+      echo "⚠️  No se encontró docker-compose.yml en ${PROJECT_DIR}"
+      echo "   Revisa que el repositorio se clonó correctamente."
+    fi
+
+    echo "=== ¡Entorno listo! ==="
+    echo "Accede con: vagrant ssh"
+    echo "Proyecto en: ${PROJECT_DIR}"
   SHELL
 end
